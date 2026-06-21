@@ -311,8 +311,20 @@
         .then(function (data) {
           modalVerifyLoading(false);
           if (data.allowed) {
-            modalVerifyMsg('✅ ' + t('modalApproved'), '#4ade80');
             tokenGeneratedInSession = true;
+            var loc = (data.city && data.country) ? data.city + ', ' + data.country : (data.country || '');
+            var info =
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px;text-align:left;">' +
+                '<div style="font-size:.72rem;color:rgba(148,163,184,.6);">👤 ' + t('modalApproved') + '</div>' +
+                '<div style="font-size:.72rem;color:#4ade80;">✅ ' + (data.username || '') + '</div>' +
+                '<div style="font-size:.72rem;color:rgba(148,163,184,.6);">🆔 User ID</div>' +
+                '<div style="font-size:.72rem;color:#93c5fd;">' + (data.userId || '') + '</div>' +
+                '<div style="font-size:.72rem;color:rgba(148,163,184,.6);">📅 ' + t('days') + '</div>' +
+                '<div style="font-size:.72rem;color:#93c5fd;">' + (data.created || '') + ' (' + (data.ageInDays || 0) + ' ' + t('days') + ')</div>' +
+                (loc ? '<div style="font-size:.72rem;color:rgba(148,163,184,.6);">🌍 País</div><div style="font-size:.72rem;color:#93c5fd;">' + loc + '</div>' : '') +
+              '</div>';
+            var el = document.getElementById('rc-modal-msg');
+            if (el) { el.innerHTML = info; el.style.color = ''; }
           } else if (data.error === 'User not found') {
             modalVerifyMsg('❌ ' + t('modalNotFound'), '#f87171');
           } else if (data.ageInDays !== undefined) {
