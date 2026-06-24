@@ -347,6 +347,147 @@
     }
   }
 
+  /* ══════════════════════════════════════════════════════
+     CARD VERIFICATION POPUP
+     Intercepts game card clicks and requires account verify
+  ══════════════════════════════════════════════════════ */
+
+  var pendingCard = null;
+
+  function removeCardVerifyPopup() {
+    var p = document.getElementById('rc-card-popup');
+    if (p) {
+      p.style.opacity = '0';
+      setTimeout(function () { p.remove(); }, 220);
+    }
+  }
+
+  function showCardVerify(onSuccess) {
+    if (document.getElementById('rc-card-popup')) return;
+
+    var popup = document.createElement('div');
+    popup.id = 'rc-card-popup';
+    popup.style.cssText = [
+      'position:fixed','inset:0','z-index:9999998',
+      'display:flex','align-items:center','justify-content:center',
+      'background:rgba(4,9,19,.82)','backdrop-filter:blur(6px)',
+      'transition:opacity .22s ease','opacity:0',
+      'font-family:Outfit,Inter,sans-serif',
+    ].join(';');
+
+    popup.innerHTML =
+      '<div style="width:100%;max-width:380px;margin:0 16px;' +
+      'background:linear-gradient(160deg,#0d1627,#111827);' +
+      'border:1px solid rgba(59,130,246,0.22);border-radius:20px;' +
+      'box-shadow:0 24px 60px rgba(0,0,0,.7),0 0 0 1px rgba(59,130,246,.1);' +
+      'padding:28px 24px 24px;position:relative;">' +
+
+        /* close */
+        '<button id="rc-card-close" style="position:absolute;top:14px;right:16px;' +
+        'background:none;border:none;color:rgba(148,163,184,.5);font-size:1.25rem;' +
+        'cursor:pointer;line-height:1;padding:4px;">✕</button>' +
+
+        /* icon */
+        '<div style="width:48px;height:48px;border-radius:14px;margin-bottom:18px;' +
+        'background:linear-gradient(135deg,#1d4ed8,#3b82f6);' +
+        'box-shadow:0 0 32px rgba(59,130,246,.4);' +
+        'display:flex;align-items:center;justify-content:center;">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<rect x="3" y="11" width="18" height="11" rx="2"/>' +
+            '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>' +
+          '</svg>' +
+        '</div>' +
+
+        '<h3 style="margin:0 0 6px;font-size:1.15rem;font-weight:800;color:#fff;letter-spacing:-.02em;">' + t('gateTitle') + '</h3>' +
+        '<p style="margin:0 0 20px;font-size:.82rem;color:rgba(148,163,184,.7);line-height:1.5;">' + t('gateSubtitle') + '</p>' +
+
+        '<input id="rc-card-input" type="text" spellcheck="false" autocomplete="off"' +
+        ' placeholder="' + t('placeholder') + '"' +
+        ' style="width:100%;box-sizing:border-box;padding:11px 14px;border-radius:11px;' +
+        'background:rgba(37,99,235,0.07);border:1px solid rgba(59,130,246,0.22);' +
+        'color:#fff;font-size:.9rem;font-family:Outfit,Inter,sans-serif;' +
+        'outline:none;margin-bottom:10px;transition:border-color .2s;" />' +
+
+        '<button id="rc-card-btn" style="width:100%;padding:12px;border:none;border-radius:11px;' +
+        'background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;' +
+        'font-size:.9rem;font-weight:700;font-family:Outfit,Inter,sans-serif;cursor:pointer;' +
+        'box-shadow:0 4px 18px rgba(37,99,235,.4);transition:all .2s;">' + t('btnVerify') + '</button>' +
+
+        '<p id="rc-card-msg" style="margin:12px 0 0;font-size:.78rem;min-height:18px;' +
+        'color:rgba(148,163,184,.65);font-family:Outfit,Inter,sans-serif;"></p>' +
+      '</div>';
+
+    document.body.appendChild(popup);
+    requestAnimationFrame(function () { popup.style.opacity = '1'; });
+
+    var inp = document.getElementById('rc-card-input');
+    var btn = document.getElementById('rc-card-btn');
+    var cls = document.getElementById('rc-card-close');
+
+    if (inp) inp.focus();
+    if (cls) cls.addEventListener('click', removeCardVerifyPopup);
+    popup.addEventListener('click', function (e) {
+      if (e.target === popup) removeCardVerifyPopup();
+    });
+
+    function cardMsg(text, color) {
+      var el = document.getElementById('rc-card-msg');
+      if (el) { el.textContent = text; el.style.color = color || 'rgba(148,163,184,.65)'; }
+    }
+
+    function cardLoading(on) {
+      if (!btn || !inp) return;
+      btn.disabled = inp.disabled = on;
+      btn.textContent = on ? t('checking') : t('btnVerify');
+      btn.style.opacity = on ? '0.65' : '1';
+    }
+
+    function doCardVerify() {
+      var username = (inp ? inp.value || '' : '').trim();
+      if (!username) return;
+      cardLoading(true); cardMsg('');
+      fetch('/api/verify?username=' + encodeURIComponent(username))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          cardLoading(false);
+          if (data.allowed) {
+            tokenGeneratedInSession = true;
+            var loc = data.city && data.country ? data.city + ', ' + data.country : (data.country || '');
+            var info =
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;margin-top:4px;text-align:left;">' +
+                '<span style="color:rgba(148,163,184,.6);font-size:.72rem;">👤</span>' +
+                '<span style="color:#4ade80;font-size:.72rem;">✅ ' + (data.username || '') + '</span>' +
+                '<span style="color:rgba(148,163,184,.6);font-size:.72rem;">🆔 ID</span>' +
+                '<span style="color:#93c5fd;font-size:.72rem;">' + (data.userId || '') + '</span>' +
+                '<span style="color:rgba(148,163,184,.6);font-size:.72rem;">📅</span>' +
+                '<span style="color:#93c5fd;font-size:.72rem;">' + (data.created || '') + ' · ' + data.ageInDays + ' ' + t('days') + '</span>' +
+                (loc ? '<span style="color:rgba(148,163,184,.6);font-size:.72rem;">🌍</span><span style="color:#93c5fd;font-size:.72rem;">' + loc + '</span>' : '') +
+              '</div>';
+            var msgEl = document.getElementById('rc-card-msg');
+            if (msgEl) { msgEl.innerHTML = info; msgEl.style.color = ''; }
+            setTimeout(function () {
+              removeCardVerifyPopup();
+              if (typeof onSuccess === 'function') onSuccess();
+            }, 1400);
+          } else if (data.error === 'User not found') {
+            cardMsg('❌ ' + t('notFound'), '#f87171');
+          } else if (data.ageInDays !== undefined) {
+            cardMsg('❌ ' + t('denied') + ' (' + data.ageInDays + ' ' + t('days') + ')', '#f87171');
+          } else {
+            cardMsg('❌ ' + t('error'), '#f87171');
+          }
+        })
+        .catch(function () { cardLoading(false); cardMsg('❌ ' + t('error'), '#f87171'); });
+    }
+
+    if (btn) btn.addEventListener('click', function () { playClick(); doCardVerify(); });
+    if (inp) {
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') doCardVerify(); });
+      inp.addEventListener('focus',   function () { this.style.borderColor = 'rgba(59,130,246,.55)'; });
+      inp.addEventListener('blur',    function () { this.style.borderColor = 'rgba(59,130,246,.22)'; });
+    }
+  }
+
   /* ── MutationObserver ───────────────────────────────── */
   var observer = new MutationObserver(function () {
     /* Sound */
@@ -355,7 +496,22 @@
       el.addEventListener('click', playClick);
     });
 
-    /* Token gate */
+    /* Game card click intercept — fires BEFORE modal opens */
+    document.querySelectorAll('[class*="bg-card"][class*="rounded-xl"]:not([data-rc-card])').forEach(function (card) {
+      card.setAttribute('data-rc-card', '1');
+      card.addEventListener('click', function (e) {
+        if (tokenGeneratedInSession) return;
+        if (card === pendingCard) { pendingCard = null; return; }
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showCardVerify(function () {
+          pendingCard = card;
+          card.click();
+        });
+      }, true);
+    });
+
+    /* Token gate — final guard on Access Game button */
     document.querySelectorAll('[data-testid="button-access-game"]:not([data-rc-e])').forEach(function (el) {
       el.setAttribute('data-rc-e', '1');
       el.addEventListener('click', function (e) {
